@@ -1,4 +1,6 @@
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -8,9 +10,12 @@ public class Main {
 
     static ByteArrayOutputStream byteArrayOutputStream;
     static DataOutputStream dataOutputStream;
+    static ByteArrayInputStream byteArrayInputStream;
+    static DataInputStream dataInputStream;
     public static void main(String[] args)throws Exception {
 
         String domainName="www.google.com";
+        //String domainName = args[1];
         String domainNameParts[]=domainName.split("\\.");
         byteArrayOutputStream=new ByteArrayOutputStream();
         dataOutputStream=new DataOutputStream(byteArrayOutputStream);
@@ -47,12 +52,78 @@ public class Main {
             DatagramPacket receivedPacked=new DatagramPacket(answer,answer.length);
             datagramSocket.receive(receivedPacked);
 
-            System.out.println("received packet size : "+answer.length);
+            System.out.println("received packet size : "+receivedPacked.getLength());
             for(int i=0;i<receivedPacked.getLength();i++)
             {
-                System.out.print("0x"+String.format("%x",answer[i])+" ");
+                System.out.print(String.format("%x",answer[i])+" ");
             }
 
+            System.out.println("\n");
+            byteArrayInputStream = new ByteArrayInputStream(answer);
+            dataInputStream = new DataInputStream(byteArrayInputStream);
+
+            System.out.println("Transaction ID : 0x"+String.format("%x",dataInputStream.readShort()));
+            System.out.println("Flags : 0x"+String.format("%x",dataInputStream.readShort()));
+            System.out.println("Questions : 0x"+String.format("%x",dataInputStream.readShort()));
+            System.out.println("Answer RRs : 0x"+String.format("%x",dataInputStream.readShort()));
+            System.out.println("Authority RRs : 0x"+String.format("%x",dataInputStream.readShort()));
+            System.out.println("Additional RRs : 0x"+String.format("%x",dataInputStream.readShort()));
+
+
+            String queryDomainName = getName();
+            System.out.println("Queries : ");
+            System.out.println("    Name : "+ queryDomainName);
+            System.out.println("    Type : "+ getType(dataInputStream.readShort()));
+            System.out.println("    Class : IN (0x"+String.format("%x",dataInputStream.readShort())+")");
+
+            dataInputStream.readShort();
+            System.out.println("Answer : ");
+            System.out.println("    Name : "+ queryDomainName);
+            System.out.println("    Type : "+ getType(dataInputStream.readShort()));
+            System.out.println("    Class : IN (0x"+String.format("%x",dataInputStream.readShort())+")");
+            System.out.println("    Time to live : "+String.format("%d",dataInputStream.readInt()));
+            System.out.println("    Data length : "+String.format("%d",dataInputStream.readShort()));
+            String nameServer = getName();
+            System.out.println("    Name Server : "+nameServer);
+
         }
+    }
+
+    static String getName()throws Exception
+    {
+        dataInputStream.readByte();
+        byte DomainNameByteArray[] = new byte[1024];
+
+        byte b=0;
+        int i=0;
+        while ((b=dataInputStream.readByte())>0)
+        {
+
+            if(!((b>='a' && b<='z')||(b>='A' && b<='Z')||(b=='-')))
+            {
+                b='.';
+            }
+            DomainNameByteArray[i]=b;
+            i++;
+        }
+        String DomainName = new String(DomainNameByteArray,0,i);
+        return DomainName;
+    }
+
+    static String getType(int a)
+    {
+        if(a==1)
+        {
+            return "A";
+        }
+        if(a==2)
+        {
+            return "NS";
+        }
+        if(a==5)
+        {
+            return "CNAME";
+        }
+        return "Unknown";
     }
 }
