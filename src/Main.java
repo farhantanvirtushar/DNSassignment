@@ -91,20 +91,28 @@ public class Main {
 
     static String getName()throws Exception
     {
-        dataInputStream.readByte();
         byte DomainNameByteArray[] = new byte[1024];
-
-        byte b=0;
-        int i=0;
-        while ((b=dataInputStream.readByte())>0)
+        int i=0,k=0;
+        while (true)
         {
-
-            if(!((b>='a' && b<='z')||(b>='A' && b<='Z')||(b=='-')))
+            k=dataInputStream.readByte();
+            if(k==0)
             {
-                b='.';
+                break;
             }
-            DomainNameByteArray[i]=b;
-            i++;
+            if(i>0)
+            {
+                DomainNameByteArray[i]='.';
+                i++;
+            }
+
+            for(int j=0;j<k;j++)
+            {
+                byte b=dataInputStream.readByte();
+                DomainNameByteArray[i]=b;
+                i++;
+            }
+
         }
         String DomainName = new String(DomainNameByteArray,0,i);
         return DomainName;
