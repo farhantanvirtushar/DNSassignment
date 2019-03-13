@@ -1,10 +1,9 @@
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Main {
 
@@ -14,26 +13,63 @@ public class Main {
     static DataInputStream dataInputStream;
 
     static String rootServer[];
-    //static String topLevelDomain[];
-    //static String topLevelDomain[];
-    //static String topLevelDomain[];
+    static String topLevelDomain[];
+    static String authoritativeDomain[];
+    static String ipAddress[];
     public static void main(String[] args) {
 
-        String domainName="www.google.com";
+        if(args.length==0)
+        {
+            System.out.println("Error");
+        }
+        int index=0;
+        String domainName=args[0];
         String rootServer = "198.41.0.4";
-        String topLevelDomain = getIP(domainName,rootServer);
-        System.out.println("Top Level Domain Server Address: "+topLevelDomain);
-        String authoritativeDomain=getIP(domainName,topLevelDomain);
-        System.out.println("Authoritative Domain Server Address: "+authoritativeDomain);
-        String ipAddress=getIP(domainName,authoritativeDomain);
-        System.out.println("found ip address for  "+domainName+" : "+ipAddress);
+        topLevelDomain = getIP(domainName,rootServer);
+
+        for(int i=0;i<topLevelDomain.length ;i++)
+        {
+            //System.out.println("Top Level Domain Server Address: "+topLevelDomain[i]);
+        }
+
+        for(int i=0;i<topLevelDomain.length;i++)
+        {
+            authoritativeDomain=getIP(domainName,topLevelDomain[i]);
+            if(authoritativeDomain.length>0)
+            {
+                break;
+            }
+        }
+
+        for(int i=0;i<authoritativeDomain.length;i++)
+        {
+            //System.out.println("Authoritative Domain Server Address: "+authoritativeDomain[i]);
+        }
+
+        for(int i=0;i<authoritativeDomain.length ;i++)
+        {
+            ipAddress=getIP(domainName,authoritativeDomain[i]);
+            if(ipAddress.length>0)
+            {
+                break;
+            }
+        }
+
+        System.out.println("found ip address for  "+domainName+" : ");
+        for(int i=0;i<ipAddress.length;i++)
+        {
+            System.out.println(ipAddress[i]);
+        }
+
         //String domainName = args[1];
 
     }
 
-    static String getIP(String domainName,String rootServer)
+    static String[] getIP(String domainName,String serverAddress)
     {
-        String ipAddress = "Unknown";
+        String ipAddress[];
+        List<String> ipAddressList = new ArrayList<String>();
+        int index=0;
         String domainNameParts[]=domainName.split("\\.");
         byteArrayOutputStream=new ByteArrayOutputStream();
         dataOutputStream=new DataOutputStream(byteArrayOutputStream);
@@ -63,7 +99,7 @@ public class Main {
 
 
             DatagramSocket datagramSocket = new DatagramSocket();
-            DatagramPacket datagramPacket = new DatagramPacket(dnsQueryMessage,msgLen, InetAddress.getByName(rootServer),53);
+            DatagramPacket datagramPacket = new DatagramPacket(dnsQueryMessage,msgLen, InetAddress.getByName(serverAddress),53);
             datagramSocket.send(datagramPacket);
 
             byte answer[]=new byte[1024];
@@ -122,7 +158,6 @@ public class Main {
 
                 if(type.equals("A"))
                 {
-                    System.out.println("\n");
                     int a=dataInputStream.readByte();
                     a= a & 0x000000ff;
                     int b=dataInputStream.readByte();
@@ -132,9 +167,9 @@ public class Main {
                     int d=dataInputStream.readByte();
                     d= d & 0x000000ff;
 
-                    ipAddress=String.format("%d.%d.%d.%d",a,b,c,d);
+                    String str = String.format("%d.%d.%d.%d",a,b,c,d);
+                    ipAddressList.add(str);
 
-                    return ipAddress;
                 }
                 else if(type.equals("AAAA"))
                 {
@@ -156,11 +191,19 @@ public class Main {
                 }
 
             }
-        }catch (Exception e)
+        }catch (EOFException e)
+        {
+            ipAddress = new String[ipAddressList.size()];
+            ipAddress = ipAddressList.toArray(ipAddress);
+            return ipAddress;
+        }
+        catch (Exception e)
         {
             System.out.println("Error ");
             System.out.println(e);
         }
+        ipAddress = new String[ipAddressList.size()];
+        ipAddress = ipAddressList.toArray(ipAddress);
         return ipAddress;
     }
     static String getName()throws Exception
