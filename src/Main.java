@@ -1,9 +1,12 @@
+import jdk.internal.dynalink.beans.StaticClass;
+
 import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Main {
 
@@ -12,64 +15,34 @@ public class Main {
     static ByteArrayInputStream byteArrayInputStream;
     static DataInputStream dataInputStream;
 
-    static String rootServer[];
-    static String topLevelDomain[];
-    static String authoritativeDomain[];
-    static String ipAddress[];
+    static String rootServer;
+    static String ipAddress;
+    static String nameServer;
     public static void main(String[] args) {
 
         if(args.length==0)
         {
             System.out.println("Error");
         }
-        int index=0;
         String domainName=args[0];
-        String rootServer = "198.41.0.4";
-        topLevelDomain = getIP(domainName,rootServer);
-
-        for(int i=0;i<topLevelDomain.length ;i++)
-        {
-            //System.out.println("Top Level Domain Server Address: "+topLevelDomain[i]);
-        }
-
-        for(int i=0;i<topLevelDomain.length;i++)
-        {
-            authoritativeDomain=getIP(domainName,topLevelDomain[i]);
-            if(authoritativeDomain.length>0)
-            {
-                break;
-            }
-        }
-
-        for(int i=0;i<authoritativeDomain.length;i++)
-        {
-            //System.out.println("Authoritative Domain Server Address: "+authoritativeDomain[i]);
-        }
-
-        for(int i=0;i<authoritativeDomain.length ;i++)
-        {
-            ipAddress=getIP(domainName,authoritativeDomain[i]);
-            if(ipAddress.length>0)
-            {
-                break;
-            }
-        }
-
-        System.out.println("found ip address for  "+domainName+" : ");
-        for(int i=0;i<ipAddress.length;i++)
-        {
-            System.out.println(ipAddress[i]);
-        }
-
-        //String domainName = args[1];
+        nameServer=domainName;
+        rootServer = "192.5.5.241";
+        ipAddress = getIP(domainName,rootServer);
+        System.out.println("ip address : "+ipAddress);
 
     }
 
-    static String[] getIP(String domainName,String serverAddress)
+
+    static String getIP(String domainName,String serverAddress)
     {
+        //System.out.println("Domain name :"+ domainName+" , "+"Server address : "+serverAddress);
+        int count=0;
+        //int x;
+        //Scanner scanner = new Scanner(System.in);
+        //x=scanner.nextInt();
+
         String ipAddress[];
         List<String> ipAddressList = new ArrayList<String>();
-        int index=0;
         String domainNameParts[]=domainName.split("\\.");
         byteArrayOutputStream=new ByteArrayOutputStream();
         dataOutputStream=new DataOutputStream(byteArrayOutputStream);
@@ -106,8 +79,8 @@ public class Main {
             DatagramPacket receivedPacked=new DatagramPacket(answer,answer.length);
             datagramSocket.receive(receivedPacked);
 
-            /*System.out.println("received packet size : "+receivedPacked.getLength());
-            for(int i=0;i<receivedPacked.getLength();i++)
+            //System.out.println("received packet size : "+receivedPacked.getLength());
+            /*for(int i=0;i<receivedPacked.getLength();i++)
             {
                 System.out.print(String.format("%x",answer[i])+" ");
             }*/
@@ -141,8 +114,10 @@ public class Main {
             while (true)
             {
 
+                count++;
                 String type="";
                 String name = getName();
+
 //                System.out.println("Answer : ");
 //                System.out.println("    Name : "+ queryDomainName);
                 int t = dataInputStream.readShort();
@@ -168,7 +143,15 @@ public class Main {
                     d= d & 0x000000ff;
 
                     String str = String.format("%d.%d.%d.%d",a,b,c,d);
-                    ipAddressList.add(str);
+                    //ipAddressList.add(str);
+
+                    //System.out.println("domain name : "+domainName);
+                    //System.out.println("name : "+name);
+                    if(count==1)
+                    {
+                        return str;
+                    }
+                   return getIP(domainName,str);
 
                 }
                 else if(type.equals("AAAA"))
@@ -186,25 +169,33 @@ public class Main {
                 }
                 else
                 {
-                    String nameServer = getName();
-                    //System.out.println("    Name Server : "+nameServer);
+                    String str =getName();
+                    if(count==1)
+                    {
+
+                        nameServer = str;
+                        //System.out.println("    Name Server : "+nameServer);
+                    }
+
                 }
 
             }
         }catch (EOFException e)
         {
-            ipAddress = new String[ipAddressList.size()];
-            ipAddress = ipAddressList.toArray(ipAddress);
-            return ipAddress;
+            //ipAddress = new String[ipAddressList.size()];
+            //ipAddress = ipAddressList.toArray(ipAddress);
+            String ip=getIP(nameServer,rootServer);
+           // System.out.println("found missing additional record : "+ip);
+            return getIP(domainName,ip);
         }
         catch (Exception e)
         {
             System.out.println("Error ");
             System.out.println(e);
         }
-        ipAddress = new String[ipAddressList.size()];
-        ipAddress = ipAddressList.toArray(ipAddress);
-        return ipAddress;
+        //ipAddress = new String[ipAddressList.size()];
+        //ipAddress = ipAddressList.toArray(ipAddress);
+        return getIP(nameServer,rootServer);
     }
     static String getName()throws Exception
     {
