@@ -1,5 +1,3 @@
-import jdk.internal.dynalink.beans.StaticClass;
-
 import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -103,7 +101,7 @@ public class Main {
             dataInputStream.readShort();
 
 
-            String queryDomainName = getName();
+            String queryDomainName = getName(answer);
 //            System.out.println("Queries : ");
 //            System.out.println("    Name : "+ queryDomainName);
 //            System.out.println("    Type : "+ getType(dataInputStream.readShort()));
@@ -116,10 +114,10 @@ public class Main {
 
                 count++;
                 String type="";
-                String name = getName();
+                String name = getName(answer);
 
 //                System.out.println("Answer : ");
-//                System.out.println("    Name : "+ queryDomainName);
+//                System.out.println("    Name : "+ name);
                 int t = dataInputStream.readShort();
                 type=getType(t);
 //                System.out.println("    Type : "+ type);
@@ -167,9 +165,15 @@ public class Main {
                     String ipv6Address=String.format("%x:%x:%x:%x:%x:%x:%x:%x",a,b,c,d,e,f,g,h);
                     //System.out.println("IPV6 Address : "+ipv6Address);
                 }
-                else
+                else if(type.equals("CNAME"))
                 {
-                    String str =getName();
+                    String cname=getName(answer);
+                    return getIP(cname,rootServer);
+                }
+                else if(type.equals("NS"))
+                {
+                    String str =getName(answer);
+
                     if(count==1)
                     {
 
@@ -185,19 +189,18 @@ public class Main {
             //ipAddress = new String[ipAddressList.size()];
             //ipAddress = ipAddressList.toArray(ipAddress);
             String ip=getIP(nameServer,rootServer);
-           // System.out.println("found missing additional record : "+ip);
             return getIP(domainName,ip);
         }
         catch (Exception e)
         {
             System.out.println("Error ");
-            System.out.println(e);
+            e.printStackTrace();
         }
         //ipAddress = new String[ipAddressList.size()];
         //ipAddress = ipAddressList.toArray(ipAddress);
         return getIP(nameServer,rootServer);
     }
-    static String getName()throws Exception
+    static String getName(byte answer[])throws Exception
     {
         byte DomainNameByteArray[] = new byte[1024];
         int i=0;
@@ -210,7 +213,29 @@ public class Main {
             }
             if(String.format("%x",k).equals("c0"))
             {
-                dataInputStream.readByte();
+                int  index = dataInputStream.readByte();
+                //System.out.println(index);
+                index= index & 0x000000ff;
+                int j=answer[index];
+                index++;
+                while (j>0)
+                {
+                    if(i>0)
+                    {
+                        DomainNameByteArray[i]='.';
+                        i++;
+                    }
+
+                    for(int l=0;l<j;l++)
+                    {
+                        DomainNameByteArray[i]=answer[index];
+                        i++;
+                        index++;
+                    }
+                    j=answer[index];
+                    index++;
+                }
+
                 break;
             }
             if(i>0)
