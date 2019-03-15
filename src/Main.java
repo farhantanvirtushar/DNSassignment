@@ -145,7 +145,8 @@ public class Main {
 
                     //System.out.println("domain name : "+domainName);
                     //System.out.println("name : "+name);
-                    if(count==1)
+
+                    if(name.equals(domainName))
                     {
                         return str;
                     }
