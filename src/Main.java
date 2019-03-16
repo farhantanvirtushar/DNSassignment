@@ -173,7 +173,10 @@ public class Main {
                     int h=dataInputStream.readShort();
                     String ipv6Address=String.format("%x:%x:%x:%x:%x:%x:%x:%x",a,b,c,d,e,f,g,h);
                     //System.out.println("IPV6 Address : "+ipv6Address);
-                    printAnswer(DOMAIN_NAME,timeToLive,type,ipv6Address);
+                    if(name.equals(DOMAIN_NAME))
+                    {
+                        printAnswer(DOMAIN_NAME,timeToLive,type,ipv6Address);
+                    }
                 }
                 else if(type.equals("CNAME"))
                 {
@@ -234,7 +237,7 @@ public class Main {
                     return "Does Not Exist";
                 }
             }
-            
+
             //loop through all additional RRs
             for(int i=0;i<additionalRRs;i++)
             {
