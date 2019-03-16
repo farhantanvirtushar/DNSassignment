@@ -12,9 +12,13 @@ public class Main {
     static ByteArrayInputStream byteArrayInputStream;
     static DataInputStream dataInputStream;
 
+    //all root server ip addresses
     static String rootServer[] = {"192.5.5.241","198.41.0.4","199.9.14.201","192.33.4.12","199.7.91.13","192.203.230.10","192.112.36.4","198.97.190.53","192.36.148.17","192.58.128.30","193.0.14.129","199.7.83.42","202.12.27.33"};
+
     static String ipAddress;
     static String nameServer;
+
+    //DOMAIN_NAME == host name that is asked for ip
     static String DOMAIN_NAME;
     public static void main(String[] args) {
 
@@ -22,14 +26,22 @@ public class Main {
         {
             System.out.println("Error");
         }
+
+        //get the domain name from first argument of command line
         DOMAIN_NAME=args[0];
         nameServer=DOMAIN_NAME;
+
+        //print the query domain name
         System.out.println("\n\n;; QUESTION SECTION:");
         printAnswer(DOMAIN_NAME,0,"A"," ");
+
+        //print the answers
         System.out.println("\n\n;; ANSWER SECTION:");
+
+        //loop through all root server addresses. If any one of them is active , then dns query is sent to the root address.
         for(int i=0;i<rootServer.length;i++)
         {
-            ipAddress = getIP(DOMAIN_NAME,rootServer[i],i);
+            ipAddress = getIP(DOMAIN_NAME,rootServer[i],i);     //getIP() method does the iterative query for DOMAIN_NAME
             if(!(ipAddress.equals("time out")))
             {
                 break;
@@ -41,23 +53,29 @@ public class Main {
     static String getIP(String domainName,String serverAddress,int serverNo)
     {
         //System.out.println("Domain name :"+ domainName+" , "+"Server address : "+serverAddress);
-        int count=0;
         //int x;
         //Scanner scanner = new Scanner(System.in);
         //x=scanner.nextInt();
 
+
+        //split the domain name into domainNameParts[] array.
         String domainNameParts[]=domainName.split("\\.");
+
         byteArrayOutputStream=new ByteArrayOutputStream();
         dataOutputStream=new DataOutputStream(byteArrayOutputStream);
+
         try{
-            dataOutputStream.writeShort(0x1234);
-            dataOutputStream.writeShort(0x0000);
-            dataOutputStream.writeShort(0x0001);
-            dataOutputStream.writeShort(0x0000);
-            dataOutputStream.writeShort(0x0000);
-            dataOutputStream.writeShort(0x0000);
+
+            //Header section
+            dataOutputStream.writeShort(0x1234);    //Transaction ID
+            dataOutputStream.writeShort(0x0000);    //Flags. Flag = 0x0000 means , "do query iteratively"
+            dataOutputStream.writeShort(0x0001);    //Number of questions
+            dataOutputStream.writeShort(0x0000);    //Number of answers
+            dataOutputStream.writeShort(0x0000);    //Number of authoritative RRs
+            dataOutputStream.writeShort(0x0000);    //Number of additional RRs
 
 
+            //get a byte array from domainNameParts[]
             int len = domainNameParts.length;
             for(int i=0;i<len;i++)
             {
@@ -66,6 +84,7 @@ public class Main {
                 dataOutputStream.write(b);
             }
 
+            //Header section
             dataOutputStream.writeByte(0x00);
             dataOutputStream.writeShort(0x0001);
             dataOutputStream.writeShort(0x0001);
@@ -74,9 +93,12 @@ public class Main {
             int msgLen = dnsQueryMessage.length;
 
 
+            //Create a datagram socket and a datagram packet at port 53 and root server address
             DatagramSocket datagramSocket = new DatagramSocket();
             DatagramPacket datagramPacket = new DatagramPacket(dnsQueryMessage,msgLen, InetAddress.getByName(serverAddress),53);
+            //send the packet
             datagramSocket.send(datagramPacket);
+            //set time out 1s (1000 ms)
             datagramSocket.setSoTimeout(1000);
 
             byte answer[] = new byte[1024];
@@ -84,11 +106,12 @@ public class Main {
 
                 DatagramPacket receivedPacked = new DatagramPacket(answer, answer.length);
                 datagramSocket.receive(receivedPacked);
-            }catch (SocketTimeoutException e)
+            }catch (SocketTimeoutException e)   //if time is out , then the getIP() method will return a message "time out"
             {
                 return "time out";
             }
 
+            //the DNS reply message is stored in answer[] array
             byteArrayInputStream = new ByteArrayInputStream(answer);
             dataInputStream = new DataInputStream(byteArrayInputStream);
 
@@ -104,6 +127,8 @@ public class Main {
             dataInputStream.readShort();    //Query Type
             dataInputStream.readShort();    //Class : IN
 
+
+            //loop through all answer RRs
             for(int i=1;i<=answerRRs;i++)
             {
                 String type="";
@@ -118,8 +143,9 @@ public class Main {
 
                 if(type.equals("A"))
                 {
+                    //read four parts of IPv4 address
                     int a=dataInputStream.readByte();
-                    a= a & 0x000000ff;
+                    a= a & 0x000000ff;          // to make sure "a" is unsigned during type cast from byte to int
                     int b=dataInputStream.readByte();
                     b= b & 0x000000ff;
                     int c=dataInputStream.readByte();
@@ -127,11 +153,11 @@ public class Main {
                     int d=dataInputStream.readByte();
                     d= d & 0x000000ff;
 
-                    ip = String.format("%d.%d.%d.%d",a,b,c,d);
+                    ip = String.format("%d.%d.%d.%d",a,b,c,d); //ip address
 
                     if(name.equals(DOMAIN_NAME))
                     {
-                        printAnswer(DOMAIN_NAME,timeToLive,type,ip);
+                        printAnswer(DOMAIN_NAME,timeToLive,type,ip); //if ip address belongs to DOMAIN_NAME , then it will be printed
                     }
 
                 }
@@ -156,12 +182,12 @@ public class Main {
                     if(name.equals(DOMAIN_NAME))
                     {
                         DOMAIN_NAME=cname;
-                        return getIP(DOMAIN_NAME,rootServer[serverNo],serverNo);
+                        return getIP(DOMAIN_NAME,rootServer[serverNo],serverNo);    //CNAME will be printed
                     }
                 }
                 else if(type.equals("SOA"))
                 {
-                    System.out.println("        "+domainName+"  :  Does Not Exist");
+                    System.out.println("        "+domainName+"  :  Does Not Exist");    //SOA means the domain name dose not exist.
                     return "Does Not Exist";
                 }
                 if(i==answerRRs)
@@ -171,9 +197,9 @@ public class Main {
 
             }
 
+            //loop through all authority RRs
             for(int i=0;i<authorityRRs;i++)
             {
-                count++;
                 String type="";
                 String name = getName(answer);  //Name :
 
@@ -208,9 +234,10 @@ public class Main {
                     return "Does Not Exist";
                 }
             }
+            
+            //loop through all additional RRs
             for(int i=0;i<additionalRRs;i++)
             {
-                count++;
                 String type="";
                 String name = getName(answer);  //Name :
 
