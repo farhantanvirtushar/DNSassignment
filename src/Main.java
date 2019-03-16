@@ -3,10 +3,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.TimeoutException;
 
 public class Main {
 
@@ -18,17 +15,22 @@ public class Main {
     static String rootServer;
     static String ipAddress;
     static String nameServer;
+    static String DOMAIN_NAME;
     public static void main(String[] args) {
 
         if(args.length==0)
         {
             System.out.println("Error");
         }
-        String domainName=args[0];
-        nameServer=domainName;
+        DOMAIN_NAME=args[0];
+        nameServer=DOMAIN_NAME;
         rootServer = "192.5.5.241";
-        ipAddress = getIP(domainName,rootServer);
-        System.out.println("ip address : "+ipAddress);
+        System.out.println("\n\n;; QUESTION SECTION:");
+        printAnswer(DOMAIN_NAME,0,"A"," ");
+        System.out.println("\n\n;; ANSWER SECTION:");
+        ipAddress = getIP(DOMAIN_NAME,rootServer);
+
+
 
     }
 
@@ -41,8 +43,6 @@ public class Main {
         //Scanner scanner = new Scanner(System.in);
         //x=scanner.nextInt();
 
-        String ipAddress[];
-        List<String> ipAddressList = new ArrayList<String>();
         String domainNameParts[]=domainName.split("\\.");
         byteArrayOutputStream=new ByteArrayOutputStream();
         dataOutputStream=new DataOutputStream(byteArrayOutputStream);
@@ -92,19 +92,111 @@ public class Main {
             dataInputStream.readShort();    //Transaction ID
             dataInputStream.readShort();    //Flags
             dataInputStream.readShort();    //Questions
-            dataInputStream.readShort();    //Answer RRs
-            dataInputStream.readShort();    //Authority RRs
-            dataInputStream.readShort();    //Additional RRs
+            short answerRRs = dataInputStream.readShort();    //Answer RRs
+            short authorityRRs = dataInputStream.readShort();    //Authority RRs
+            short additionalRRs = dataInputStream.readShort();    //Additional RRs
 
             //Query section
             String queryDomainName = getName(answer);   //query domain name
             dataInputStream.readShort();    //Query Type
             dataInputStream.readShort();    //Class : IN
 
-            while (true)
+            for(int i=1;i<=answerRRs;i++)
             {
-                //Answer section
+                String type="";
+                String ip="";
+                String name = getName(answer);  //Name :
 
+                int t = dataInputStream.readShort();
+                type=getType(t);
+                dataInputStream.readShort();    //Class : IN
+                int timeToLive = dataInputStream.readInt();      //Time to live :
+                dataInputStream.readShort();    //Data length :
+
+                if(type.equals("A"))
+                {
+                    int a=dataInputStream.readByte();
+                    a= a & 0x000000ff;
+                    int b=dataInputStream.readByte();
+                    b= b & 0x000000ff;
+                    int c=dataInputStream.readByte();
+                    c= c & 0x000000ff;
+                    int d=dataInputStream.readByte();
+                    d= d & 0x000000ff;
+
+                    ip = String.format("%d.%d.%d.%d",a,b,c,d);
+
+                    if(name.equals(DOMAIN_NAME))
+                    {
+                        printAnswer(DOMAIN_NAME,timeToLive,type,ip);
+                    }
+
+                }
+                else if(type.equals("AAAA"))
+                {
+                    int a=dataInputStream.readShort();
+                    int b=dataInputStream.readShort();
+                    int c=dataInputStream.readShort();
+                    int d=dataInputStream.readShort();
+                    int e=dataInputStream.readShort();
+                    int f=dataInputStream.readShort();
+                    int g=dataInputStream.readShort();
+                    int h=dataInputStream.readShort();
+                    String ipv6Address=String.format("%x:%x:%x:%x:%x:%x:%x:%x",a,b,c,d,e,f,g,h);
+                    //System.out.println("IPV6 Address : "+ipv6Address);
+                    printAnswer(DOMAIN_NAME,timeToLive,type,ipv6Address);
+                }
+                if(type.equals("CNAME"))
+                {
+                    String cname=getName(answer);
+                    printAnswer(DOMAIN_NAME,timeToLive,type,cname);
+                    if(name.equals(DOMAIN_NAME))
+                    {
+                        DOMAIN_NAME=cname;
+                        return getIP(DOMAIN_NAME,rootServer);
+                    }
+                }
+                if(i==answerRRs)
+                {
+                    return ip;
+                }
+
+            }
+
+            for(int i=0;i<authorityRRs;i++)
+            {
+                count++;
+                String type="";
+                String name = getName(answer);  //Name :
+
+                int t = dataInputStream.readShort();
+                type=getType(t);
+                dataInputStream.readShort();    //Class : IN
+                dataInputStream.readInt();      //Time to live :
+                dataInputStream.readShort();    //Data length :
+
+                if(type.equals("CNAME"))
+                {
+                    String cname=getName(answer);
+                    return getIP(cname,rootServer);
+                }
+                else if(type.equals("NS"))
+                {
+                    String str =getName(answer);
+                    nameServer=str;
+                    if(additionalRRs==0)
+                    {
+                        String nameServerIp=getIP(nameServer,rootServer);
+                        String ip= getIP(domainName,nameServerIp);
+                        if(!(ip.equals("time out")))
+                        {
+                            return ip;
+                        }
+                    }
+                }
+            }
+            for(int i=0;i<additionalRRs;i++)
+            {
                 count++;
                 String type="";
                 String name = getName(answer);  //Name :
@@ -151,27 +243,8 @@ public class Main {
                     String ipv6Address=String.format("%x:%x:%x:%x:%x:%x:%x:%x",a,b,c,d,e,f,g,h);
                     //System.out.println("IPV6 Address : "+ipv6Address);
                 }
-                else if(type.equals("CNAME"))
-                {
-                    String cname=getName(answer);
-                    return getIP(cname,rootServer);
-                }
-                else if(type.equals("NS"))
-                {
-                    String str =getName(answer);
-
-                    if(count==1)
-                    {
-                        nameServer = str;
-                    }
-
-                }
 
             }
-        }catch (EOFException e)
-        {
-            String ip=getIP(nameServer,rootServer);
-            return getIP(domainName,ip);
         }
         catch (Exception e)
         {
@@ -254,5 +327,9 @@ public class Main {
             return "AAAA";
         }
         return "Unknown";
+    }
+    static  void printAnswer(String domainName,int timeToLive,String type,String address)
+    {
+        System.out.println(String.format("%30s",domainName)+ "  "+String.format("%10s",timeToLive)+"    IN  "+String.format("%10s",type)+"    "+address);
     }
 }
