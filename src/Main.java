@@ -12,7 +12,7 @@ public class Main {
     static ByteArrayInputStream byteArrayInputStream;
     static DataInputStream dataInputStream;
 
-    static String rootServer;
+    static String rootServer[] = {"192.5.5.241","198.41.0.4","199.9.14.201","192.33.4.12","199.7.91.13","192.203.230.10","192.112.36.4","198.97.190.53","192.36.148.17","192.58.128.30","193.0.14.129","199.7.83.42","202.12.27.33"};
     static String ipAddress;
     static String nameServer;
     static String DOMAIN_NAME;
@@ -24,18 +24,21 @@ public class Main {
         }
         DOMAIN_NAME=args[0];
         nameServer=DOMAIN_NAME;
-        rootServer = "192.5.5.241";
         System.out.println("\n\n;; QUESTION SECTION:");
         printAnswer(DOMAIN_NAME,0,"A"," ");
         System.out.println("\n\n;; ANSWER SECTION:");
-        ipAddress = getIP(DOMAIN_NAME,rootServer);
-
-
-
+        for(int i=0;i<rootServer.length;i++)
+        {
+            ipAddress = getIP(DOMAIN_NAME,rootServer[i],i);
+            if(!(ipAddress.equals("time out")))
+            {
+                break;
+            }
+        }
     }
 
 
-    static String getIP(String domainName,String serverAddress)
+    static String getIP(String domainName,String serverAddress,int serverNo)
     {
         //System.out.println("Domain name :"+ domainName+" , "+"Server address : "+serverAddress);
         int count=0;
@@ -146,15 +149,20 @@ public class Main {
                     //System.out.println("IPV6 Address : "+ipv6Address);
                     printAnswer(DOMAIN_NAME,timeToLive,type,ipv6Address);
                 }
-                if(type.equals("CNAME"))
+                else if(type.equals("CNAME"))
                 {
                     String cname=getName(answer);
                     printAnswer(DOMAIN_NAME,timeToLive,type,cname);
                     if(name.equals(DOMAIN_NAME))
                     {
                         DOMAIN_NAME=cname;
-                        return getIP(DOMAIN_NAME,rootServer);
+                        return getIP(DOMAIN_NAME,rootServer[serverNo],serverNo);
                     }
+                }
+                else if(type.equals("SOA"))
+                {
+                    System.out.println("        "+domainName+"  :  Does Not Exist");
+                    return "Does Not Exist";
                 }
                 if(i==answerRRs)
                 {
@@ -178,7 +186,7 @@ public class Main {
                 if(type.equals("CNAME"))
                 {
                     String cname=getName(answer);
-                    return getIP(cname,rootServer);
+                    return getIP(cname,rootServer[serverNo],serverNo);
                 }
                 else if(type.equals("NS"))
                 {
@@ -186,13 +194,18 @@ public class Main {
                     nameServer=str;
                     if(additionalRRs==0)
                     {
-                        String nameServerIp=getIP(nameServer,rootServer);
-                        String ip= getIP(domainName,nameServerIp);
+                        String nameServerIp=getIP(nameServer,rootServer[serverNo],serverNo);
+                        String ip= getIP(domainName,nameServerIp,serverNo);
                         if(!(ip.equals("time out")))
                         {
                             return ip;
                         }
                     }
+                }
+                else if(type.equals("SOA"))
+                {
+                    System.out.println("        "+domainName+"  :  Does Not Exist");
+                    return "Does Not Exist";
                 }
             }
             for(int i=0;i<additionalRRs;i++)
@@ -224,7 +237,7 @@ public class Main {
                     {
                         return str;
                     }
-                    String ip = getIP(domainName,str);
+                    String ip = getIP(domainName,str,serverNo);
                     if(!(ip.equals("time out")))
                     {
                         return ip;
@@ -251,7 +264,7 @@ public class Main {
             System.out.println("Error ");
             e.printStackTrace();
         }
-        return getIP(nameServer,rootServer);
+        return getIP(nameServer,rootServer[serverNo],serverNo);
     }
     static String getName(byte answer[])throws Exception
     {
@@ -321,6 +334,10 @@ public class Main {
         if(a==5)
         {
             return "CNAME";
+        }
+        if(a==6)
+        {
+            return "SOA";
         }
         if(a==28)
         {
