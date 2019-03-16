@@ -2,9 +2,11 @@ import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeoutException;
 
 public class Main {
 
@@ -72,62 +74,46 @@ public class Main {
             DatagramSocket datagramSocket = new DatagramSocket();
             DatagramPacket datagramPacket = new DatagramPacket(dnsQueryMessage,msgLen, InetAddress.getByName(serverAddress),53);
             datagramSocket.send(datagramPacket);
+            datagramSocket.setSoTimeout(1000);
 
-            byte answer[]=new byte[1024];
-            DatagramPacket receivedPacked=new DatagramPacket(answer,answer.length);
-            datagramSocket.receive(receivedPacked);
+            byte answer[] = new byte[1024];
+            try {
 
-            //System.out.println("received packet size : "+receivedPacked.getLength());
-            /*for(int i=0;i<receivedPacked.getLength();i++)
+                DatagramPacket receivedPacked = new DatagramPacket(answer, answer.length);
+                datagramSocket.receive(receivedPacked);
+            }catch (SocketTimeoutException e)
             {
-                System.out.print(String.format("%x",answer[i])+" ");
-            }*/
+                return "time out";
+            }
 
-            //System.out.println("\n");
             byteArrayInputStream = new ByteArrayInputStream(answer);
             dataInputStream = new DataInputStream(byteArrayInputStream);
 
-            //System.out.println("Transaction ID : 0x"+String.format("%x",dataInputStream.readShort()));
-            //System.out.println("Flags : 0x"+String.format("%x",dataInputStream.readShort()));
-            //System.out.println("Questions : 0x"+String.format("%x",dataInputStream.readShort()));
-            //System.out.println("Answer RRs : 0x"+String.format("%x",dataInputStream.readShort()));
-            //System.out.println("Authority RRs : 0x"+String.format("%x",dataInputStream.readShort()));
-            //System.out.println("Additional RRs : 0x"+String.format("%x",dataInputStream.readShort()));
-            dataInputStream.readShort();
-            dataInputStream.readShort();
-            dataInputStream.readShort();
-            dataInputStream.readShort();
-            dataInputStream.readShort();
-            dataInputStream.readShort();
+            dataInputStream.readShort();    //Transaction ID
+            dataInputStream.readShort();    //Flags
+            dataInputStream.readShort();    //Questions
+            dataInputStream.readShort();    //Answer RRs
+            dataInputStream.readShort();    //Authority RRs
+            dataInputStream.readShort();    //Additional RRs
 
-
-            String queryDomainName = getName(answer);
-//            System.out.println("Queries : ");
-//            System.out.println("    Name : "+ queryDomainName);
-//            System.out.println("    Type : "+ getType(dataInputStream.readShort()));
-//            System.out.println("    Class : IN (0x"+String.format("%x",dataInputStream.readShort())+")");
-            dataInputStream.readShort();
-            dataInputStream.readShort();
+            //Query section
+            String queryDomainName = getName(answer);   //query domain name
+            dataInputStream.readShort();    //Query Type
+            dataInputStream.readShort();    //Class : IN
 
             while (true)
             {
+                //Answer section
 
                 count++;
                 String type="";
-                String name = getName(answer);
+                String name = getName(answer);  //Name :
 
-//                System.out.println("Answer : ");
-//                System.out.println("    Name : "+ name);
                 int t = dataInputStream.readShort();
                 type=getType(t);
-//                System.out.println("    Type : "+ type);
-//                System.out.println("    Class : IN (0x"+String.format("%x",dataInputStream.readShort())+")");
-//                System.out.println("    Time to live : "+String.format("%d",dataInputStream.readInt()));
-//                System.out.println("    Data length : "+String.format("%d",dataInputStream.readShort()));
-
-                dataInputStream.readShort();
-                dataInputStream.readInt();
-                dataInputStream.readShort();
+                dataInputStream.readShort();    //Class : IN
+                dataInputStream.readInt();      //Time to live :
+                dataInputStream.readShort();    //Data length :
 
                 if(type.equals("A"))
                 {
@@ -141,17 +127,16 @@ public class Main {
                     d= d & 0x000000ff;
 
                     String str = String.format("%d.%d.%d.%d",a,b,c,d);
-                    //ipAddressList.add(str);
-
-                    //System.out.println("domain name : "+domainName);
-                    //System.out.println("name : "+name);
 
                     if(name.equals(domainName))
                     {
                         return str;
                     }
-                   return getIP(domainName,str);
-
+                    String ip = getIP(domainName,str);
+                    if(!(ip.equals("time out")))
+                    {
+                        return ip;
+                    }
                 }
                 else if(type.equals("AAAA"))
                 {
@@ -177,9 +162,7 @@ public class Main {
 
                     if(count==1)
                     {
-
                         nameServer = str;
-                        //System.out.println("    Name Server : "+nameServer);
                     }
 
                 }
@@ -187,8 +170,6 @@ public class Main {
             }
         }catch (EOFException e)
         {
-            //ipAddress = new String[ipAddressList.size()];
-            //ipAddress = ipAddressList.toArray(ipAddress);
             String ip=getIP(nameServer,rootServer);
             return getIP(domainName,ip);
         }
@@ -197,8 +178,6 @@ public class Main {
             System.out.println("Error ");
             e.printStackTrace();
         }
-        //ipAddress = new String[ipAddressList.size()];
-        //ipAddress = ipAddressList.toArray(ipAddress);
         return getIP(nameServer,rootServer);
     }
     static String getName(byte answer[])throws Exception
@@ -215,7 +194,6 @@ public class Main {
             if(String.format("%x",k).equals("c0"))
             {
                 int  index = dataInputStream.readByte();
-                //System.out.println(index);
                 index= index & 0x000000ff;
                 int j=answer[index];
                 index++;
