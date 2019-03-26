@@ -22,13 +22,11 @@ public class Main {
     static String DOMAIN_NAME;
     public static void main(String[] args) {
 
-        if(args.length==0)
-        {
-            System.out.println("Error");
-        }
+
+        Scanner scanner = new Scanner(System.in);
 
         //get the domain name from first argument of command line
-        DOMAIN_NAME=args[0];
+        DOMAIN_NAME=scanner.nextLine();
         nameServer=DOMAIN_NAME;
 
         //print the query domain name
